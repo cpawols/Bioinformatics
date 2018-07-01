@@ -10,8 +10,8 @@ cnn_autoencoder_config = {
     CHANNELS: 3,
 
     LEARNING_RATE: 0.001,
-    MODEL_NAME: 'autoencoder',
-    MODEL_DIR: '/home/pawols/auto',
+    MODEL_NAME: 'autoencoder2',
+    MODEL_DIR: '/home/pawols/auto2/',
     MODEL_SUMMARY_DIR: '/home/pawols/auto/summary',
-    CHECKPOINTS: True
+    CHECKPOINTS: False
 }

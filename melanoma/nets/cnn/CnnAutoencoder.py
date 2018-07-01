@@ -1,22 +1,34 @@
+"""
+Module contains CNN based autoencoder for images.
+"""
+
 import os
 import sys
 
 import numpy as np
 import tensorflow as tf
+
 from tqdm import tqdm
 
-from melanoma.constants.Constants import HEIGHT, WIDTH, CHANNELS, LEARNING_RATE, MODEL_DIR, EPOCH_NUMBER, BATCH_SIZE, \
-    CHECKPOINTS
+from melanoma.constants.Constants import (HEIGHT, WIDTH, CHANNELS, LEARNING_RATE, MODEL_DIR, EPOCH_NUMBER, BATCH_SIZE,
+                                          CHECKPOINTS, MODEL_NAME)
 from melanoma.data_preparator.read_data import iterator
 from melanoma.nets.BaseNetwork import BaseNetwork
-from melanoma.nets.classify.CnnAutoencoderConfig import cnn_autoencoder_config
-from melanoma.nets.classify.CnnConfig import model_config
+from melanoma.nets.config.CnnAutoencoderConfig import cnn_autoencoder_config
 
 
 class CnnAutoencoder(BaseNetwork):
+    """
+    Autoencoder for color images.
+
+    NOTE: Current architecture is prepared for images 200 x 200 pixels.
+    In case changing image size you have to change number of filters in conv layers.
+    """
+
     def __init__(self, configuration):
         super().__init__(configuration)
 
+        # Input to network.
         self.input_x = None
         self.target = None
         self.droput_keep = None
@@ -25,25 +37,32 @@ class CnnAutoencoder(BaseNetwork):
         self.decoded = None
 
     def build_graph(self):
+        """
+        Builds network graph. Network contains 3 convolutional layers for encoder and 3 convolutional layers
+        for decoder.
+        """
         with tf.name_scope('inputs'):
+            # (batch, height, width, channels)
             self.input_x = tf.placeholder(tf.float32,
                                           shape=[None, self._conf[HEIGHT], self._conf[WIDTH], self._conf[CHANNELS]],
                                           name='features')
+            # (batch, height, width, channels)
             self.target = tf.placeholder(tf.float32,
                                          shape=[None, self._conf[HEIGHT], self._conf[WIDTH], self._conf[CHANNELS]])
-
+            # droput keep probability
             self.droput_keep = tf.placeholder(dtype=tf.float32)
 
+        # Number of filters for each of convolution layer.
         layer_1 = 32
         layer_2 = 16
         layer_3 = 8
 
         with tf.name_scope("encoder"):
-            # (batch_size, width, hight, 16)
+            # (batch_size, width, hight, 32)
             conv_1 = tf.layers.conv2d(self.input_x, filters=layer_1, kernel_size=(5, 5), padding='same',
                                       activation=tf.nn.relu)
             pool_1 = tf.layers.max_pooling2d(conv_1, (2, 2), 2, padding='same')
-
+            print(pool_1.get_shape())
             # (batch_size, width/2, hight/2, 8)
             conv_2 = tf.layers.conv2d(pool_1, filters=layer_2, kernel_size=(3, 3), padding='same',
                                       activation=tf.nn.relu)
@@ -52,7 +71,7 @@ class CnnAutoencoder(BaseNetwork):
             # (batch_size, width/4, hight/4, 8)
             conv_3 = tf.layers.conv2d(pool_2, filters=layer_3, kernel_size=(3, 3), padding='same',
                                       activation=tf.nn.relu)
-            self.encoded = tf.layers.max_pooling2d(conv_3, (2, 2), 2, padding='same')
+            self.encoded = tf.layers.max_pooling2d(conv_3, (2, 2), 2, padding='same', name='a')
             print(self.encoded.shape)
 
         with tf.name_scope("decoder"):
@@ -63,18 +82,17 @@ class CnnAutoencoder(BaseNetwork):
             decoder = tf.layers.conv2d(decoded, filters=layer_2, kernel_size=(3, 3), padding='same',
                                        activation=tf.nn.relu)
             decoder = self.unsaple_2d(decoder, 2)
-            print(decoder.get_shape())
 
             decoder = tf.layers.conv2d(decoder, filters=layer_1, kernel_size=(3, 3), padding='same',
                                        activation=tf.nn.relu)
             decoder = self.unsaple_2d(decoder, 2)
-            print(decoder.get_shape())
 
             self.decoded = tf.layers.conv2d(decoder, filters=self._conf[CHANNELS], kernel_size=(5, 5), padding='same',
-                                            activation=tf.nn.sigmoid, name='decoded_image')
-            print(decoder.get_shape())
+                                            activation=tf.nn.sigmoid, name='decoded')
+            print(self.decoded)
 
         with tf.name_scope('loss'):
+            # Loss function - square error between original picture and reconstructed
             self.loss = tf.reduce_sum(tf.square(self.input_x - self.decoded))
             tf.summary.scalar('loss', self.loss)
         self.saver = tf.train.Saver(tf.global_variables())
@@ -116,9 +134,10 @@ class CnnAutoencoder(BaseNetwork):
         return session.run(self.decoded, feed_dict=feed_dict)
 
     def load(self, session: tf.Session):
-        super().load()
+        super().load(session)
         self.input_x = session.graph.get_operation_by_name('inputs/features').outputs[0]
-        self.decoded = session.graph.get_operation_by_name('decoder/decoded_image').outputs[0]
+        self.decoded = session.graph.get_tensor_by_name('decoder/decoded/Sigmoid:0')
+
 
 
 def train_model(configuration):
@@ -153,11 +172,11 @@ def train_model(configuration):
                 batch_x, batch_y = iterator.get_next_batch()
                 batch_x = batch_x[:2]
 
-                
                 summary, step = model.train(session, batch_x)
 
                 if epoch % 1000 == 0:
-                    checkpoint_path = os.path.join(configuration[MODEL_DIR], "autoencoder.ckpt")
+                    checkpoint_path = os.path.join(configuration[MODEL_DIR],
+                                                   "{}.ckpt".format(configuration[MODEL_NAME]))
                     model.saver.save(session, checkpoint_path, global_step=step)
                     writer_train.add_summary(summary, step)
 
@@ -175,7 +194,7 @@ def predict(configuration):
             model = CnnAutoencoder(configuration)
             model.load(session)
 
-            batch_xs, batch_ys = iterator(configuration[BATCH_SIZE])
+            batch_xs, batch_ys = iterator.get_next_batch()
             batch_xs = batch_xs.reshape(-1, configuration[HEIGHT], configuration[WIDTH], configuration[CHANNELS])
 
             reconstructed_images = model.predict(session, batch_xs)
@@ -183,4 +202,4 @@ def predict(configuration):
 
 
 if __name__ == "__main__":
-    train_model(cnn_autoencoder_config)
+    print(predict(cnn_autoencoder_config))

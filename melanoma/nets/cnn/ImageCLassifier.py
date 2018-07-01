@@ -10,7 +10,7 @@ from tqdm import tqdm
 from melanoma.constants.Constants import HEIGHT, WIDTH, CHANNELS, CLASS_NUMBER, DROPOUT_KEEP_PROB, MODEL_NAME, \
     EPOCH_NUMBER, BATCH_SIZE, MODEL_DIR, CHECKPOINTS, MODEL_SUMMARY_DIR, LEARNING_RATE
 from melanoma.nets.BaseNetwork import BaseNetwork
-from melanoma.nets.classify.CnnAutoencoderConfig import cnn_autoencoder_config
+from melanoma.nets.config.CnnConfig import model_config
 
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
@@ -195,4 +195,4 @@ def predict(configuration):
 
 
 if __name__ == "__main__":
-    predict(cnn_autoencoder_config)
+    predict(model_config)

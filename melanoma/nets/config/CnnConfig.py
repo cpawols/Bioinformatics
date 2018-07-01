@@ -3,7 +3,7 @@ from melanoma.constants.Constants import (EPOCH_NUMBER, BATCH_SIZE, HEIGHT, WIDT
                                           MODEL_SUMMARY_DIR)
 
 model_config = {
-    EPOCH_NUMBER: 100,
+    EPOCH_NUMBER: 10,
     BATCH_SIZE: 256,
 
     HEIGHT: 28,
