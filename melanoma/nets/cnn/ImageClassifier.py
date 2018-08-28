@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score
 from tensorflow.examples.tutorials.mnist import input_data
 from tqdm import tqdm
 
-from melanoma.constants.Constants import HEIGHT, WIDTH, CHANNELS, CLASS_NUMBER, DROPOUT_KEEP_PROB, MODEL_NAME, \
+from melanoma.constants.constants import HEIGHT, WIDTH, CHANNELS, CLASS_NUMBER, DROPOUT_KEEP_PROB, MODEL_NAME, \
     EPOCH_NUMBER, BATCH_SIZE, MODEL_DIR, CHECKPOINTS, MODEL_SUMMARY_DIR, LEARNING_RATE
 from melanoma.nets.BaseNetwork import BaseNetwork
 from melanoma.nets.config.CnnConfig import model_config

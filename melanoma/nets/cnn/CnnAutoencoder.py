@@ -7,10 +7,11 @@ import sys
 
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 
-from melanoma.constants.Constants import (HEIGHT, WIDTH, CHANNELS, LEARNING_RATE, MODEL_DIR, EPOCH_NUMBER, BATCH_SIZE,
+from melanoma.constants.constants import (HEIGHT, WIDTH, CHANNELS, LEARNING_RATE, MODEL_DIR, EPOCH_NUMBER, BATCH_SIZE,
                                           CHECKPOINTS, MODEL_NAME)
 from melanoma.data_preparator.read_data import iterator
 from melanoma.nets.BaseNetwork import BaseNetwork
@@ -25,7 +26,7 @@ class CnnAutoencoder(BaseNetwork):
     In case changing image size you have to change number of filters in conv layers.
     """
 
-    def __init__(self, configuration):
+    def __init__(self, configuration: dict):
         super().__init__(configuration)
 
         # Input to network.
@@ -62,7 +63,7 @@ class CnnAutoencoder(BaseNetwork):
             conv_1 = tf.layers.conv2d(self.input_x, filters=layer_1, kernel_size=(5, 5), padding='same',
                                       activation=tf.nn.relu)
             pool_1 = tf.layers.max_pooling2d(conv_1, (2, 2), 2, padding='same')
-            print(pool_1.get_shape())
+
             # (batch_size, width/2, hight/2, 8)
             conv_2 = tf.layers.conv2d(pool_1, filters=layer_2, kernel_size=(3, 3), padding='same',
                                       activation=tf.nn.relu)
@@ -72,7 +73,6 @@ class CnnAutoencoder(BaseNetwork):
             conv_3 = tf.layers.conv2d(pool_2, filters=layer_3, kernel_size=(3, 3), padding='same',
                                       activation=tf.nn.relu)
             self.encoded = tf.layers.max_pooling2d(conv_3, (2, 2), 2, padding='same', name='a')
-            print(self.encoded.shape)
 
         with tf.name_scope("decoder"):
             decoder = tf.layers.conv2d(self.encoded, filters=layer_3, kernel_size=(3, 3), padding='same',
@@ -89,7 +89,6 @@ class CnnAutoencoder(BaseNetwork):
 
             self.decoded = tf.layers.conv2d(decoder, filters=self._conf[CHANNELS], kernel_size=(5, 5), padding='same',
                                             activation=tf.nn.sigmoid, name='decoded')
-            print(self.decoded)
 
         with tf.name_scope('loss'):
             # Loss function - square error between original picture and reconstructed
@@ -105,7 +104,7 @@ class CnnAutoencoder(BaseNetwork):
         self.saver = tf.train.Saver(tf.global_variables())
 
     @staticmethod
-    def unsaple_2d(image, size):
+    def unsaple_2d(image: tf.Variable, size: int):
         """
         Operation which produced image `size` times bigger.
 
@@ -122,9 +121,10 @@ class CnnAutoencoder(BaseNetwork):
             self.target: images
         }
 
-        _, summary, step = session.run([self.optimizer, self.summary, self.global_step], feed_dict=feed_dict)
+        _, summary, step, loss = session.run([self.optimizer, self.summary, self.global_step, self.loss],
+                                             feed_dict=feed_dict)
 
-        return summary, step
+        return summary, step, loss
 
     def predict(self, session: tf.Session, images: np.array):
         feed_dict = {
@@ -139,8 +139,7 @@ class CnnAutoencoder(BaseNetwork):
         self.decoded = session.graph.get_tensor_by_name('decoder/decoded/Sigmoid:0')
 
 
-
-def train_model(configuration):
+def train_model(configuration: dict):
     with tf.Graph().as_default():
 
         if not os.path.exists(configuration[MODEL_DIR]):
@@ -172,7 +171,7 @@ def train_model(configuration):
                 batch_x, batch_y = iterator.get_next_batch()
                 batch_x = batch_x[:2]
 
-                summary, step = model.train(session, batch_x)
+                summary, step, loss = model.train(session, batch_x)
 
                 if epoch % 1000 == 0:
                     checkpoint_path = os.path.join(configuration[MODEL_DIR],
@@ -180,10 +179,13 @@ def train_model(configuration):
                     model.saver.save(session, checkpoint_path, global_step=step)
                     writer_train.add_summary(summary, step)
 
+                if epoch % 500 == 0:
+                    print(loss)
+
             model.save(session)
 
 
-def predict(configuration):
+def predict(configuration: dict):
     with tf.Graph().as_default():
         if not os.path.exists(configuration[MODEL_DIR]):
             sys.exit('{} model does not exist'.format(configuration[MODEL_DIR]))
@@ -201,5 +203,12 @@ def predict(configuration):
             return reconstructed_images
 
 
+def show_image(image: np.array):
+    plt.imshow(image)
+    plt.show()
+
+
 if __name__ == "__main__":
-    print(predict(cnn_autoencoder_config))
+    image = predict(cnn_autoencoder_config)
+    batch_xs, batch_ys = iterator.get_next_batch()
+    show_image(image[0])
